@@ -16,9 +16,12 @@ AudioPlayer myRecord;
 boolean recorded;
 boolean playback;
 
+int q;
+
 void setup() {
 
-  size(400, 400);
+  size(612, 400);
+  background(0);
   smooth();
 
   minim = new Minim(this);
@@ -26,29 +29,34 @@ void setup() {
   in = minim.getLineIn(Minim.STEREO, 2048);
   out = minim.getLineOut(Minim.STEREO);
   recorder = minim.createRecorder(in, "recording.wav");
+  
+  q = 1;
+  
 }
 
 void draw() {
-  background(0);
+
 
   if ( playback ) {
 
     int count = 0;
+    float r = 0;
     int lowFreq = 0;
-        
-    //noFill();
 
     for ( int i = 0; i < myRecord.left.size()/3.0; i+=5 ) {
-     lowFreq += ( abs ( myRecord.left.get(i)) * 50 );
-     count ++; 
+      lowFreq += ( abs ( myRecord.left.get(i)) * 50 );
+      r += ( abs ( myRecord.mix.get(i)) * 25);
+      count ++;
     }
-    
-    float x = map(lowFreq, 0, count*50, 0, 255);
-    
-    stroke(255);
-    fill(x*10,0,0);
-    ellipse(width/2,height/2,60,60);
 
+    float x = map(lowFreq, 0, count*25, 50, 255);
+
+    noStroke();
+    fill((x-50)*2, 8);
+    rect(0, 0, width/q, height);
+    stroke(x*2, 0, 0, 127);
+    fill(x, 0, 0, 50);
+    ellipse(width/2, height/2, r, r);
   }
 
   if ( recorder.isRecording() ) {
@@ -95,17 +103,17 @@ void keyReleased() {
     playback = true;
     println("is playing");
   }
-  
-  if (key == 'a'){
-    println(player);
-    println(myRecord);
+
+  if (key == 'a') {
+    q += 1;
+    if( q > 2) q = 1;
   }
-  
 }
 
 
 void stop() {
-
+  in.close();
+  player.close();
   myRecord.close();
   minim.stop();
   super.stop();
