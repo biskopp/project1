@@ -7,26 +7,16 @@ import ddf.minim.ugens.*;
 
 // General declarations:
 
-int bedtime = 22;
-
+int bedtime = 20;
 boolean isBedtime;
-boolean wantRecord;
-boolean preRecord;
 
 // Minim declarations:
 
 Minim minim;
 
-AudioInput in;
-AudioOutput out;
-AudioRecorder recorder;
-
-FilePlayer player;
-AudioPlayer myRecord;
 AudioPlayer preRecorded;
 FFT freqLog;
 
-boolean recorded;
 boolean playback;
 
 int baseHz = 100;  //size of the smallest octave in Hz
@@ -37,6 +27,7 @@ int sampleRate = 44100;
 int bufferSize = 512;
 
 //Philips Hue declarations:
+HueControl hc;
 
 int[] val = { 0, 0, 0};
 int[] prev = { 0, 0, 0 };
@@ -45,27 +36,25 @@ int[] currentCol = { 0, 0, 0 };
 int[] len = new int[3];
 String[] toStr = new String[3];
 
+int hue;
+
 boolean isLight;
 boolean prevLight;
 
 Client c;
 String data;
 
-String apiKey = "26ec30f23a2aea1f676e1c0208245ff";
-String light = "4";
-String IP = "192.168.0.199";
+String light;
+String IP;
 
 void setup() {
 
   size(400, 400);
   background(127);
+  frameRate(15);
 
   // initializing minim elements
   minim = new Minim(this);
-
-  in = minim.getLineIn(Minim.STEREO, bufferSize);
-  out = minim.getLineOut(Minim.STEREO);
-  recorder = minim.createRecorder(in, "recording.wav");
 
   preRecorded = minim.loadFile("200mader.wav", bufferSize);
   freqLog = new FFT( bufferSize, sampleRate );
@@ -76,11 +65,20 @@ void setup() {
   println(preRecorded);
   //println("Bands: " + numBands);
 
-
-  // initializing general elements
-
-
   // initializing the Philips Hue
+
+  hc = new HueControl("26ec30f23a2aea1f676e1c0208245ff"); //insert PhilipsDev API key into constructor
+  IP = hc.ipSearch();
+
+  for ( int i = 1; i <= hc.lightsInSystem(); i++ ) {
+    if (  hc.isReachable(i) == true ) {
+      light = str(i);
+      break;
+    } else {
+      light = str(0);
+    }
+  }
+
   currentCol[0] = 0;   // The Brightness  (value btw. 0 - 254)
   currentCol[1] = 254; // The Saturation  (value btw. 0 - 254)
   currentCol[2] = 0;   // The Hue         (value btw. 0 - 65535)
@@ -96,17 +94,12 @@ void draw() {
 
   if ( playback ) { 
 
-    if ( wantRecord ) { 
-      freqLog.forward( myRecord.mix );
-      //println("Bandwidth: " + freqLog.getBandWidth() + " Hz");
-    }
-
-    if ( preRecord ) {
-      freqLog.forward( preRecorded.mix );
-      //println("Bandwidth: " + freqLog.getBandWidth() + " Hz");
-    }
+    freqLog.forward( preRecorded.mix );
+    //println("Bandwidth: " + freqLog.getBandWidth() + " Hz");
 
     int bri = 0;
+    hue = 0;
+    hue += (int) map ( mouseX, 0, width, 0, 65535 ); 
 
     int highBands = numBands - 1;
     for ( int i = 0; i < numBands; i++ ) {
@@ -138,67 +131,25 @@ void draw() {
       avg /= (hiBound - lowBound + 1);
       averageB = avg; 
 
-      // **** Below is the 8 bands of frequencies **** \\
+      //  For every i'th iteration the loop, is a corresponding frequency range \\
+      //  The lowest range being from 0 Hz - 172 Hz and the highest 11025.0 Hz - 22050.0 Hz \\
+      //  I have combined 4 ranges under one if-statement to get a wider frequency input into one variable \\
 
-      // ** Between 0.0 Hz - 172.0 Hz ** \\
-      //if ( i == 0) {
-      //  //println(averageB);
-      //  if ( averageB > 30 ) {
-      //  }
-      //}
-
-      // ** Between 172.0 Hz - 344.0 Hz ** \\
-      //if ( i == 1 ) {
-      //}
-
-      // ** Between 344.0 Hz - 689.0 Hz ** \\
+      // ** Between 172.0 Hz - 2756.0 Hz ** \\
       if ( i == 1 || i == 2 || i == 3 || i == 4 ) {
         //println("num: " + i + " : " + averageB);
-        if ( averageB > 0 && averageB < 4.5 ) {
-          bri += (int) map ( averageB, 0, 4.5, 0, 254 );
-          float lol = map ( averageB, 0, 4.5, 0, width );
-          fill(bri, 0, 0, 127);
-          ellipse(width/2, height/2, lol, lol);
-        }
-      }
-
-      // ** Between 689.0 Hz - 1378.0 Hz ** \\
-      //if ( i == 3 ) {
-      //  //println(averageB);
-      //  if ( averageB > 0 && averageB < 20 ) {
-      //  }
-      //}
-
-      // ** Between 1378.0 Hz - 2756.0 Hz ** \\
-      //if ( i == 4 ) {
-      //  //println(averageB);
-      //  if ( averageB > 0 && averageB < 25 ) {
-      //  }
-      //}
-
-      // ** Between 2756.0 Hz - 5512.0 Hz ** \\
-      if ( i == 5 ) {
-        //println(averageB);
-        if ( averageB > 1 && averageB < 16 ) {
-        }
-      }
-
-      // ** Between 5512.0 Hz - 11025.0 Hz ** \\
-      if ( i == 6 ) {
-        //println(averageB);
-        if ( averageB >= 0 && averageB <= 8 ) {
-        }
-      }
-
-      // ** Between 11025.0 Hz - 22050.0 Hz ** \\
-      if ( i == 7 ) {
-        //println(averageB);
-        if ( averageB > 0 && averageB < 5 ) {
+        if ( averageB >= 0 && averageB <= 4.5 ) {
+          bri += int( map ( averageB, 0, 4.5, 0, 127 ) );
+          float displayVis = map ( averageB, 0, 4.5, 0, width );
+          colorMode(HSB, 65535, 254, 254);
+          fill(hue, 254, bri, 127);
+          ellipse(width/2, height/2, displayVis, displayVis);
         }
       }
     }
 
     currentCol[0] = bri;
+    currentCol[2] = hue;
     //println(currentCol[0]);
   } // end "playback" bracket
 
@@ -210,94 +161,38 @@ void draw() {
   }
 
   if ( isLight != prevLight ) {  // if new reading is different than the old one
+    c = new Client(this, IP, 80); // Connect to server on port 80 
+    hc.sendData(c, isLight, light);
 
-    c = new Client(this, IP, 80); // Connect to server on port 80
-    if ( c.active() ) {
-      c.write("PUT /api/" + apiKey + "/lights/" + light + "/state HTTP/1.1\r\n"); 
-      c.write("Content-Length: " + 20 + "\r\n\r\n");
-      c.write("{\"on\":" + isLight + "}\r\n");
-      c.write("\r\n");
-      c.stop();
-      //sendHTTPData();
-
-      println("sent: " + isLight + " :"); // command executed
-      delay(1); // slight delay
-      prevLight = isLight; // set previous
-    } else {
-      println("could not connect to server");
-    }
+    delay(1);
+    prevLight = isLight;
   }
 
-  if (val[0] != prev[0] ) { // if new reading is different than the old one
-
+  if ( val[0] != prev[0] ) { // if new reading is different than the old one
     c = new Client(this, IP, 80); // Connect to server on port 80
-    if ( c.active() ) {
-      c.write("PUT /api/" + apiKey + "/lights/" + light + "/state HTTP/1.1\r\n"); 
-      c.write("Content-Length: " + 18 + len[0] + "\r\n\r\n");
-      c.write("{\"bri\":" + val[0] + "}\r\n");
-      c.write("\r\n");
-      c.stop();
-      //sendHTTPData();
+    hc.sendData(c, "bri", light, len[0], val[0]);
 
-      println("sent: bri : " + val[0]);  // command executed
-      delay(1);                          // slight delay
-      prev[0] = val[0];                  // set previous
-    } else {
-      println("could not connect to server");
-    }
+    delay(1); 
+    prev[0] = val[0];
   }
 
-  if (val[1] != prev[1] ) { // if new reading is different than the old one
-
+  if ( val[1] != prev[1] ) { // if new reading is different than the old one
     c = new Client(this, IP, 80); // Connect to server on port 80
-    if ( c.active() ) {
-      c.write("PUT /api/" + apiKey + "/lights/" + light + "/state HTTP/1.1\r\n"); 
-      c.write("Content-Length: " + 18 + len[1] + "\r\n\r\n");
-      c.write("{\"sat\":" + val[1] + "}\r\n");
-      c.write("\r\n");
-      c.stop();
-      //sendHTTPData();
+    hc.sendData(c, "sat", light, len[1], val[1]);
 
-      println("sent: sat :"); // command executed
-      delay(1);               // slight delay
-      prev[1] = val[1];       //set previous
-    } else {
-      println("could not connect to server");
-    }
+    delay(1); 
+    prev[1] = val[1];
   }
 
-  if (val[2] != prev[2] ) { // if new reading is different than the old one
-
+  if ( val[2] != prev[2] ) { // if new reading is different than the old one
     c = new Client(this, IP, 80); // Connect to server on port 80
-    if ( c.active() ) {
-      c.write("PUT /api/" + apiKey + "/lights/" + light + "/state HTTP/1.1\r\n"); 
-      c.write("Content-Length: " + 18 + len[2] + "\r\n\r\n");
-      c.write("{\"hue\":" + val[2] + "}\r\n");
-      c.write("\r\n");
-      c.stop();
-      //sendHTTPData();
+    hc.sendData(c, "hue", light, len[2], val[2]);
 
-      println("sent: hue :");  // command executed
-      delay(1);                // slight delay
-      prev[2] = val[2];        //set previous
-    } else {
-      println("could not connect to server");
-    }
+    delay(1); 
+    prev[2] = val[2];
   }
 
   //println("Val 1: " + val[0] + " | Val 2: " + val[1] + " | Val 3: " + val[2]);
-
-
-  if ( !playback && wantRecord ) {
-
-    if ( recorder.isRecording() ) {
-      println("Now recording, press the r key to stop recording.");
-    } else if ( !recorded ) {
-      println("Press the r key to start recording.");
-    } else {
-      println("Press the s key to save");
-    }
-  }
 
   noStroke();
   fill(127, 8);
@@ -313,87 +208,23 @@ void sendHTTPData() {
 }
 
 void keyReleased() {
+  
+  if ( key == 'o' && !isLight && isBedtime ) {
 
-  if ( key == 'w' ) {
-    wantRecord = true; 
-    println("want record myself");
-  }
-  if ( key == 'p' ) {
-    preRecord = true; 
-    println("using preRecorded audio");
-  }
-
-  if ( wantRecord ) {
-
-    if ( !recorded && key == 'r' ) {
-
-      if ( recorder.isRecording() ) {
-        recorder.endRecord();
-        recorded = true;
-      } else {
-        recorder.beginRecord();
-      }
-    }
-
-    if ( recorded && key == 's' ) {
-
-      if ( player != null ) {
-        player.unpatch( out );
-        player.close();
-      }
-
-      player = new FilePlayer( recorder.save() );
-      player.patch( out );
-      println("is saved");
-    }
-
-    if ( player != null && key == 'l') {
-      myRecord = minim.loadFile("recording.wav", bufferSize);
-      println("file loaded");
-    }
-
-    if (myRecord != null && key == 'm') {
-      freqLog = new FFT( bufferSize, sampleRate );
-      freqLog.logAverages(baseHz, bandPOct); // this creates 8 bands.
-      freqLog.window(FFT.HAMMING);
-      numBands = freqLog.avgSize();
-      //println("Bands: " + numBands);
-      println("freq loaded");
-    }
-  }
-
-  if ( key == 'o' && !isLight ) {
     isLight = true;
     currentCol[2] = 1;
-
-    if ( myRecord != null && wantRecord ) {
-      myRecord.loop();
-      playback = true;
-      println("is playing");
-    }
-
-    if ( preRecord ) {
-      preRecorded.loop();
-      playback = true;
-      println("is playing");
-    }
+    preRecorded.play();
+    playback = true;
+    println("is playing");
   } else if ( key == 'o' && isLight ) {
+
     isLight = false;
-
-    if ( myRecord != null && wantRecord ) {
-      myRecord.close();
-    }
-
-    if ( preRecord ) {
-      preRecorded.close();
-    }
+    preRecorded.pause();
+    preRecorded.rewind();
   }
 }
 
 void stop() {
-  in.close();
-  player.close();
-  myRecord.close();
   preRecorded.close();
   minim.stop();
   super.stop();
