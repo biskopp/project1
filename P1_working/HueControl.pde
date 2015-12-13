@@ -1,4 +1,4 @@
-class HueControl {
+class HueControl  {
 
   String _ip;
   String _apiKey;
@@ -32,9 +32,9 @@ class HueControl {
   String ipSearch() {
 
     if ( isOnline ) {  
-      
+
       JSONArray _ipSearch = loadJSONArray("https://www.meethue.com/api/nupnp");
-      
+
       for ( int i = 0; i < _ipSearch.size(); i++ ) {
         JSONObject ip = _ipSearch.getJSONObject(i);
         String temp = ip.getString("internalipaddress");
@@ -86,9 +86,8 @@ class HueControl {
         JSONObject lightNumbers = _lights.getJSONObject(str(lightNum));
         JSONObject states = lightNumbers.getJSONObject("state");
 
-        boolean reachable = states.getBoolean("reachable");
+        return states.getBoolean("reachable");
 
-        return reachable;
       } else {
         println("the lamp does not exist");
         return false;
@@ -96,6 +95,11 @@ class HueControl {
     } else {
       return false;
     }
+  }
+
+  boolean isOnline() {
+
+    return isOnline;
   }
 
 
@@ -130,29 +134,36 @@ class HueControl {
 
   void sendData(Client input, String HSBL, String lightInSys, int leng, int value ) {
 
-   if ( isOnline ){ 
-    input.write("PUT /api/" + _apiKey + "/lights/" + lightInSys + "/state HTTP/1.1\r\n"); 
-    input.write("Content-Length: " + 18 + leng + "\r\n\r\n");
-    input.write("{\"" + HSBL + "\":" + value + "}\r\n");
-    input.write("\r\n");
-    input.stop();
-    //sendHTTPData();
+    if ( isOnline ) { 
+      input.write("PUT /api/" + _apiKey + "/lights/" + lightInSys + "/state HTTP/1.1\r\n"); 
+      input.write("Content-Length: " + 18 + leng + "\r\n\r\n");
+      input.write("{\"" + HSBL + "\":" + value + "}\r\n");
+      input.write("\r\n");
+      input.stop();
+      sendHTTPData();
 
-    println("sent "+ HSBL + ":" + value);  // command executed
-   }
+      println("sent "+ HSBL + ":" + value);  // command executed
+    }
   }
 
   void sendData(Client input, boolean on, String lightInSys ) {
 
-    if ( isOnline ){
+    if ( isOnline ) {
       input.write("PUT /api/" + _apiKey + "/lights/" + lightInSys + "/state HTTP/1.1\r\n"); 
       input.write("Content-Length: " + 20 + "\r\n\r\n");
       input.write("{\"on\":" + on + "}\r\n");
       input.write("\r\n");
       input.stop();
-      //sendHTTPData();
-      println("sent:" + isLight ); // command executed
+      sendHTTPData();
+      
+      println("sent on:" + isLight ); // command executed
+    }
   }
-}
 
+  void sendHTTPData() {
+    if (c.available() > 0) { // If there's incoming data from the client...
+      data = c.readString(); // ...then grab it and print it
+      println(data);
+    }
+  }
 }

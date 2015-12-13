@@ -1,0 +1,9 @@
+#JSGF V1.0;
+
+/**
+ * JSGF Test Grammar file
+ */
+
+grammar VIKI;
+
+public <VIKI> = ( Sesame | Cheese | Fuck | Crisp ) * ;
